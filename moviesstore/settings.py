@@ -23,7 +23,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 
 DEBUG = os.getenv("APP_ENV", "development") == "development"
 
-ALLOWED_HOSTS = ["localhost", "pythonanywhere.chrisgoggins.com"]
+ALLOWED_HOSTS = ["localhost", "chrisgoggins.pythonanywhere.com"]
 
 # Application definition
 
