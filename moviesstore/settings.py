@@ -17,11 +17,11 @@ from dotenv import load_dotenv
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-load_dotenv(f"${BASE_DIR}/.env")
+load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 
-DEBUG = True if os.getenv("APP_ENV", "development") else False
+DEBUG = os.getenv("APP_ENV", "development") == "development"
 
 ALLOWED_HOSTS = ["localhost", "pythonanywhere.chrisgoggins.com"]
 
