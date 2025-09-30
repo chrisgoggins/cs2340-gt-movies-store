@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="p-3">
+  <div class="container">
+    <div class="row mt-3">
+      <div class="col-md-10 col-lg-8 mx-auto mb-3">
+        <h2>Requests</h2>
+        <hr />
+        {% if template_data.requests %}
+        <ul class="list-group">
+          {% for r in template_data.requests %}
+          <li class="list-group-item">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <h5 class="mb-1">{{ r.name }} from {{ r.user }}</h5>
+                <small class="text-muted">{{ r.created_at }}</small>
+                <p class="mb-1">{{ r.description }}</p>
+                <h5 class="mb-1">{{ r.total_votes }}</h5>
+              </div>
+              <form method="POST" action="{% url 'movies.request_vote' r.id %}">
+                {% csrf_token %}
+                {% if r.id in template_data.voted_ids %}
+                <button type="submit" class="btn btn-secondary">Unvote</button>
+                {% else %}
+                <button type="submit" class="btn btn-primary">Vote</button>
+                {% endif %}
+              </form>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="alert alert-info">No requests yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
