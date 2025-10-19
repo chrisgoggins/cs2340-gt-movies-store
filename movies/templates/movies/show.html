@@ -9,6 +9,40 @@
         <hr />
         <p><b>Description:</b> {{ template_data.movie.description }}</p>
         <p><b>Price:</b> ${{ template_data.movie.price }}</p>
+        <p><b>Average Rating:</b>
+          {% if template_data.average_rating %}
+            {{ template_data.average_rating|floatformat:1 }} / 5
+            ({{ template_data.rating_count }} rating{{ template_data.rating_count|pluralize }})
+          {% else %}
+            No ratings yet
+          {% endif %}
+        </p>
+        <div class="mb-4">
+          <h5>Rate this movie</h5>
+          {% if user.is_authenticated %}
+          <form method="post" class="d-flex flex-wrap align-items-center gap-2" action="{% url 'movies.rate' id=template_data.movie.id %}">
+            {% csrf_token %}
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              {% for rating in template_data.rating_choices %}
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="rating" id="rating-{{ rating }}" value="{{ rating }}" {% if template_data.user_rating == rating %}checked{% endif %}>
+                <label class="form-check-label" for="rating-{{ rating }}">{{ rating }}</label>
+              </div>
+              {% endfor %}
+            </div>
+            <button class="btn btn-sm bg-dark text-white" type="submit">Save Rating</button>
+          </form>
+          {% if template_data.user_rating %}
+          <form method="post" class="mt-2" action="{% url 'movies.rate' id=template_data.movie.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="clear">
+            <button class="btn btn-link p-0" type="submit">Remove my rating</button>
+          </form>
+          {% endif %}
+          {% else %}
+          <p><a href="{% url 'accounts.login' %}?next={{ request.path }}">Sign in</a> to rate this movie.</p>
+          {% endif %}
+        </div>
         <p class="card-text">
           <form method="post" action="{% url 'cart.add' id=template_data.movie.id %}">
             <div class="row">

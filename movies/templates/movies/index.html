@@ -38,6 +38,14 @@
               class="btn bg-dark text-white">
               {{ movie.name }}
             </a>
+            <p class="mt-2 mb-0">
+              {% if movie.avg_rating %}
+                {{ movie.avg_rating|floatformat:1 }} / 5
+                ({{ movie.rating_count }} rating{{ movie.rating_count|pluralize }})
+              {% else %}
+                No ratings yet
+              {% endif %}
+            </p>
           </div>
         </div>
       </div>

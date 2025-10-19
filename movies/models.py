@@ -21,6 +21,23 @@ class Review(models.Model):
     def __str__(self):
         return str(self.id) + ' - ' + self.movie.name
 
+class Rating(models.Model):
+    RATING_CHOICES = [(i, str(i)) for i in range(1, 6)]
+
+    id = models.AutoField(primary_key=True)
+    movie = models.ForeignKey(Movie, related_name='ratings', on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    value = models.PositiveSmallIntegerField(choices=RATING_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('movie', 'user')
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f"{self.movie.name} - {self.user.username}: {self.value}"
+
 class MovieRequest(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255)
