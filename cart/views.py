@@ -49,6 +49,9 @@ def purchase(request):
     order = Order()
     order.user = request.user
     order.total = cart_total
+    profile = getattr(request.user, 'profile', None)
+    if profile and profile.region:
+        order.region = profile.region
     order.save()
     for movie in movies_in_cart:
         item = Item()

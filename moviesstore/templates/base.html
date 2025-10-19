@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"crossorigin="anonymous"></script>
     <link rel="stylesheet" type="text/css" href="{% static 'css/style.css' %}">
+    {% block extra_head %}{% endblock extra_head %}
     <meta name="viewport" content="width=device-width, initial-scale=1" />
   </head>
   <body>
@@ -28,6 +29,9 @@
               href="{% url 'movies.index' %}">Movies
             </a>
             <a class="nav-link"
+              href="{% url 'movies.popularity_map' %}">Popularity Map
+            </a>
+            <a class="nav-link"
               href="{% url 'movies.requests' %}">Requests
             </a>
             <a class="nav-link"
@@ -35,6 +39,9 @@
             </a>
             <a class="nav-link"
               href="{% url 'accounts.orders' %}">Orders
+            </a>
+            <a class="nav-link"
+              href="{% url 'accounts.profile' %}">Account Settings
             </a>
             <a class="nav-link"
               href="{% url 'cart.index' %}">Cart
@@ -74,9 +81,11 @@
             <p>
               <a class="nav-link" href="{% url 'home.about' %}">About</a>
               <a class="nav-link" href="{% url 'movies.index' %}">Movies</a>
+              <a class="nav-link" href="{% url 'movies.popularity_map' %}">Popularity Map</a>
               <a class="nav-link" href="{% url 'movies.requests' %}">Requests</a>
               <a class="nav-link" href="{% url 'movies.requests_all' %}">Requests All</a>
               <a class="nav-link" href="{% url 'accounts.orders' %}">Orders</a>
+              <a class="nav-link" href="{% url 'accounts.profile' %}">Account Settings</a>
               <a class="nav-link" href="{% url 'cart.index' %}">Cart</a>
             </p>
           </div>
@@ -103,5 +112,6 @@
       </div>
     </section>
     <!-- Footer -->
+    {% block extra_scripts %}{% endblock extra_scripts %}
   </body>
 </html>

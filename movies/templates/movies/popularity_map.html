@@ -1,0 +1,285 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}" />
+{% endblock extra_head %}
+
+{% block content %}
+<div class="p-3">
+  <div class="container">
+    <div class="row mt-3">
+      <div class="col-12 mb-3">
+        <h2>Local Popularity Map</h2>
+        <p class="mb-3">Discover which GT Movie Store titles are trending in each region. Click a marker or choose a region to see the top performers, then compare the list with your own recent purchases.</p>
+        {% if not template_data.user_region_code %}
+        <div class="alert alert-info" role="alert">
+          Select your home region in <a href="{% url 'accounts.profile' %}">Account Settings</a> so new purchases are tracked accurately.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="row g-4">
+      <div class="col-lg-8">
+        <div id="popularity-map" class="w-100 border rounded" style="min-height: 420px;"></div>
+      </div>
+      <div class="col-lg-4">
+        <div class="card h-100 shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title">Region Details</h5>
+            <label for="region-select" class="form-label">Choose a region</label>
+            <select id="region-select" class="form-select mb-3">
+              <option value="">View all regions</option>
+              {% for region in template_data.regions %}
+              <option value="{{ region.code }}" {% if template_data.user_region_code == region.code %}selected{% endif %}>{{ region.name }}</option>
+              {% endfor %}
+            </select>
+            <div id="region-summary">
+              <h6 class="fw-semibold" id="region-summary-title">Select a region to view trending titles.</h6>
+              <ul class="list-group" id="region-trending-list">
+                <li class="list-group-item">No region selected.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="row mt-4 g-4">
+      <div class="col-lg-6">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h4 class="card-title">Overall Top Sellers</h4>
+            <p class="card-text">Snapshot of the most purchased titles across every region.</p>
+            <ul class="list-group">
+              {% if template_data.global_trending %}
+                {% for entry in template_data.global_trending %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                  {{ entry.title }}
+                  <span class="badge bg-dark rounded-pill">{{ entry.total }}</span>
+                </li>
+                {% endfor %}
+              {% else %}
+                <li class="list-group-item">No purchases recorded yet.</li>
+              {% endif %}
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h4 class="card-title">Your Recent Purchases</h4>
+            <p class="card-text">Use this list to verify the map data against your own activity.</p>
+            <div class="table-responsive">
+              <table class="table table-striped align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th scope="col">Date</th>
+                    <th scope="col">Region</th>
+                    <th scope="col">Movie</th>
+                    <th scope="col" class="text-end">Qty</th>
+                  </tr>
+                </thead>
+                <tbody id="user-purchase-table">
+                  <tr><td colspan="4">Loading your purchase history…</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="mt-2">
+              <a class="btn btn-link p-0" href="{% url 'accounts.orders' %}">View full order history</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{{ template_data.region_payload|json_script:'region-data' }}
+{{ template_data.user_purchase_history|json_script:'user-purchases-data' }}
+{% endblock content %}
+
+{% block extra_scripts %}
+<script src="{% static 'vendor/leaflet/leaflet.js' %}"></script>
+<script>
+  (function() {
+    const regionDataElement = document.getElementById('region-data');
+    const purchaseDataElement = document.getElementById('user-purchases-data');
+    const regionData = regionDataElement ? JSON.parse(regionDataElement.textContent) : [];
+    const purchases = purchaseDataElement ? JSON.parse(purchaseDataElement.textContent) : [];
+
+    const mapContainer = document.getElementById('popularity-map');
+    if (!mapContainer) {
+      return;
+    }
+
+    if (typeof L === 'undefined') {
+      mapContainer.classList.add('d-flex', 'align-items-center', 'justify-content-center', 'bg-light');
+      mapContainer.innerHTML = '<div class="text-center"><h5 class="mb-2">Interactive map unavailable</h5><p class="mb-0">We could not load the map scripts. Make sure the static Leaflet assets are collected and accessible.</p></div>';
+      renderRegionDetailsFallback();
+      return;
+    }
+
+    const defaultCenter = regionData.length ? [regionData[0].center_lat, regionData[0].center_lng] : [33.749, -84.388];
+    const map = L.map('popularity-map', {
+      scrollWheelZoom: false
+    }).setView(defaultCenter, 4);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 12,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    const markers = {};
+    regionData.forEach((region) => {
+      const marker = L.marker([region.center_lat, region.center_lng]).addTo(map);
+      const popupText = `<strong>${region.name}</strong><br />Total purchases: ${region.total_purchases || 0}`;
+      marker.bindPopup(popupText);
+      marker.on('click', () => {
+        regionSelect.value = region.code;
+        renderRegionDetails(region.code);
+      });
+      markers[region.code] = marker;
+    });
+
+    const regionSelect = document.getElementById('region-select');
+    const trendingList = document.getElementById('region-trending-list');
+    const summaryTitle = document.getElementById('region-summary-title');
+    const purchaseTable = document.getElementById('user-purchase-table');
+
+    function renderRegionDetails(code) {
+      while (trendingList.firstChild) {
+        trendingList.removeChild(trendingList.firstChild);
+      }
+
+      let selectedRegion = null;
+      if (code) {
+        selectedRegion = regionData.find((region) => region.code === code);
+      }
+
+      if (!selectedRegion) {
+        summaryTitle.textContent = 'Showing combined trends across all regions.';
+        const li = document.createElement('li');
+        li.className = 'list-group-item';
+        li.textContent = 'Select a region to see the top five titles in that area.';
+        trendingList.appendChild(li);
+      } else {
+        summaryTitle.textContent = `${selectedRegion.name} — Top Titles`;
+        if (!selectedRegion.top_movies.length) {
+          const li = document.createElement('li');
+          li.className = 'list-group-item';
+          li.textContent = 'No purchases recorded for this region yet.';
+          trendingList.appendChild(li);
+        } else {
+          selectedRegion.top_movies.forEach((movie, idx) => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item d-flex justify-content-between align-items-center';
+            li.innerHTML = `<span>${idx + 1}. ${movie.title}</span><span class="badge bg-dark rounded-pill">${movie.total}</span>`;
+            trendingList.appendChild(li);
+          });
+        }
+        const marker = markers[code];
+        if (marker) {
+          marker.openPopup();
+          map.setView(marker.getLatLng(), 5);
+        }
+      }
+
+      renderPurchaseTable(code);
+    }
+
+    function renderPurchaseTable(code) {
+      while (purchaseTable.firstChild) {
+        purchaseTable.removeChild(purchaseTable.firstChild);
+      }
+      const filtered = code ? purchases.filter((purchase) => purchase.region_code === code) : purchases;
+      if (!filtered.length) {
+        const row = document.createElement('tr');
+        const cell = document.createElement('td');
+        cell.colSpan = 4;
+        cell.textContent = code ? 'You have no purchases recorded in this region yet.' : 'You have not made any purchases yet.';
+        row.appendChild(cell);
+        purchaseTable.appendChild(row);
+        return;
+      }
+
+      filtered.forEach((purchase) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `<td>${purchase.date}</td><td>${purchase.region_name}</td><td>${purchase.movie}</td><td class="text-end">${purchase.quantity}</td>`;
+        purchaseTable.appendChild(row);
+      });
+    }
+
+    if (regionSelect) {
+      regionSelect.addEventListener('change', (event) => {
+        renderRegionDetails(event.target.value);
+      });
+    }
+
+    const defaultRegion = regionSelect ? regionSelect.value : null;
+    renderRegionDetails(defaultRegion);
+
+    function renderRegionDetailsFallback() {
+      const regionSelect = document.getElementById('region-select');
+      const trendingList = document.getElementById('region-trending-list');
+      const summaryTitle = document.getElementById('region-summary-title');
+      const purchaseTable = document.getElementById('user-purchase-table');
+
+      if (summaryTitle) {
+        summaryTitle.textContent = 'Map data could not be rendered. Showing aggregated lists instead.';
+      }
+
+      if (trendingList) {
+        while (trendingList.firstChild) {
+          trendingList.removeChild(trendingList.firstChild);
+        }
+        const combinedTop = regionData
+          .flatMap((region) => region.top_movies.map((movie) => ({
+            region: region.name,
+            title: movie.title,
+            total: movie.total
+          })))
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 5);
+
+        if (!combinedTop.length) {
+          const li = document.createElement('li');
+          li.className = 'list-group-item';
+          li.textContent = 'No purchase data available yet.';
+          trendingList.appendChild(li);
+        } else {
+          combinedTop.forEach((entry, idx) => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item';
+            li.innerHTML = `<strong>${idx + 1}. ${entry.title}</strong><br><small>${entry.total} total purchases (${entry.region})</small>`;
+            trendingList.appendChild(li);
+          });
+        }
+      }
+
+      if (purchaseTable) {
+        while (purchaseTable.firstChild) {
+          purchaseTable.removeChild(purchaseTable.firstChild);
+        }
+        if (!purchases.length) {
+          const row = document.createElement('tr');
+          const cell = document.createElement('td');
+          cell.colSpan = 4;
+          cell.textContent = 'You have not made any purchases yet.';
+          row.appendChild(cell);
+          purchaseTable.appendChild(row);
+        } else {
+          purchases.forEach((purchase) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td>${purchase.date}</td><td>${purchase.region_name}</td><td>${purchase.movie}</td><td class="text-end">${purchase.quantity}</td>`;
+            purchaseTable.appendChild(row);
+          });
+        }
+      }
+
+      if (regionSelect) {
+        regionSelect.disabled = true;
+      }
+    }
+  })();
+</script>
+{% endblock extra_scripts %}

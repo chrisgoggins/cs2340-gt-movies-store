@@ -1,12 +1,13 @@
 from django.db import models
 from django.contrib.auth.models import User
-from movies.models import Movie
+from movies.models import Movie, Region
 
 class Order(models.Model):
     id = models.AutoField(primary_key=True)
     total = models.IntegerField()
     date = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    region = models.ForeignKey(Region, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
     
     def __str__(self):
         return str(self.id) + ' - ' + self.user.username

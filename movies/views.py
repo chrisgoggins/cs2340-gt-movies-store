@@ -1,7 +1,10 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from .models import Movie, Review, Rating, MovieRequest, MovieRequestVote
+from django.utils.timezone import localtime
+
+from .models import Movie, Review, Rating, Region, MovieRequest, MovieRequestVote
+from cart.models import Item
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Avg
+from django.db.models import Count, Avg, Sum, F
 
 def index(request):
     search_term = request.GET.get('search')
@@ -108,6 +111,89 @@ def rate_movie(request, id):
     )
 
     return redirect('movies.show', id=id)
+
+
+@login_required
+def popularity_map(request):
+    regions = Region.objects.all()
+
+    region_payload = []
+    for region in regions:
+        top_movies_qs = (
+            Item.objects.filter(order__region=region)
+            .values('movie_id')
+            .annotate(title=F('movie__name'), total=Sum('quantity'))
+            .order_by('-total')
+        )
+        top_movies = [
+            {
+                'movie_id': row['movie_id'],
+                'title': row['title'],
+                'total': row['total'],
+            }
+            for row in top_movies_qs[:5]
+        ]
+        total_purchases = sum(row['total'] for row in top_movies)
+        region_payload.append(
+            {
+                'id': region.id,
+                'name': region.name,
+                'code': region.code,
+                'center_lat': region.center_lat,
+                'center_lng': region.center_lng,
+                'top_movies': top_movies,
+                'total_purchases': total_purchases,
+            }
+        )
+
+    global_trending_qs = (
+        Item.objects.values('movie_id')
+        .annotate(title=F('movie__name'), total=Sum('quantity'))
+        .order_by('-total')[:5]
+    )
+    global_trending = [
+        {
+            'movie_id': row['movie_id'],
+            'title': row['title'],
+            'total': row['total'],
+        }
+        for row in global_trending_qs
+    ]
+
+    user_purchase_history = []
+    user_items = (
+        Item.objects.filter(order__user=request.user)
+        .select_related('movie', 'order__region')
+        .order_by('-order__date')[:15]
+    )
+    for item in user_items:
+        order_region = item.order.region
+        user_purchase_history.append(
+            {
+                'order_id': item.order_id,
+                'movie': item.movie.name,
+                'quantity': item.quantity,
+                'region_code': order_region.code if order_region else 'unassigned',
+                'region_name': order_region.name if order_region else 'Unassigned',
+                'date': localtime(item.order.date).strftime('%Y-%m-%d %H:%M'),
+            }
+        )
+
+    user_region = None
+    profile = getattr(request.user, 'profile', None)
+    if profile and profile.region:
+        user_region = profile.region.code
+
+    template_data = {
+        'title': 'Local Popularity Map',
+        'regions': regions,
+        'global_trending': global_trending,
+        'region_payload': region_payload,
+        'user_purchase_history': user_purchase_history,
+        'user_region_code': user_region,
+    }
+
+    return render(request, 'movies/popularity_map.html', {'template_data': template_data})
 
 @login_required
 def requests_page(request):

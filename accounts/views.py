@@ -1,9 +1,9 @@
 from django.shortcuts import render
 from django.contrib.auth import login as auth_login, authenticate, logout as auth_logout
-from .forms import CustomUserCreationForm, CustomErrorList
+from .forms import CustomUserCreationForm, CustomErrorList, ProfileForm
+from .models import UserProfile
 from django.shortcuts import redirect
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
 
 @login_required
 def logout(request):
@@ -44,6 +44,25 @@ def signup(request):
         else:
             template_data['form'] = form
             return render(request, 'accounts/signup.html', {'template_data': template_data})
+
+@login_required
+def profile(request):
+    template_data = {'title': 'Account Settings'}
+    profile = getattr(request.user, 'profile', None)
+    if profile is None:
+        profile = UserProfile.objects.create(user=request.user)
+
+    if request.method == 'POST':
+        form = ProfileForm(request.POST, instance=profile)
+        if form.is_valid():
+            form.save()
+            template_data['success'] = 'Account preferences updated successfully.'
+            form = ProfileForm(instance=profile)
+    else:
+        form = ProfileForm(instance=profile)
+
+    template_data['form'] = form
+    return render(request, 'accounts/profile.html', {'template_data': template_data})
         
 @login_required
 def orders(request):

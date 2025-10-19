@@ -1,6 +1,20 @@
 from django.db import models
 from django.contrib.auth.models import User
 
+
+class Region(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=255, unique=True)
+    code = models.SlugField(max_length=64, unique=True)
+    center_lat = models.FloatField()
+    center_lng = models.FloatField()
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
 class Movie(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255)
